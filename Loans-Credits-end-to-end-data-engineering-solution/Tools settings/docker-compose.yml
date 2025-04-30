@@ -1,0 +1,217 @@
+#version: '3.7'
+
+networks:
+  spark-network:
+    driver: bridge
+  default:
+    driver: bridge
+
+services:
+
+  airflow-redis:
+    image: redis:alpine
+    container_name: airflow-redis
+    ports:
+      - "6379:6379"
+    
+  airflow-postgres:
+    image: postgres:13
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+      - ./airflow/dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "5432:5432"
+
+  airflow-webserver:
+    image: apache/airflow:latest
+    container_name: airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=redis://airflow-redis:6379/0
+      - AIRFLOW__WEBSERVER__SECRET_KEY=secretkey
+    ports:
+      - "8090:8080"
+    depends_on:
+      - airflow-postgres
+      - airflow-redis
+    command: bash -c "
+        airflow db init &&
+        airflow users create --username airflow --firstname admin --lastname admin --role Admin --email admin@example.org --password airflow || true &&
+        airflow webserver"
+    
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - /var/run/docker.sock:/var/run/docker.sock
+
+
+  airflow-scheduler:
+    image: apache/airflow:latest
+    container_name: airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=redis://airflow-redis:6379/0
+    depends_on:
+      - airflow-webserver
+      - airflow-redis
+      - airflow-postgres
+    command: airflow scheduler
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  airflow-worker:
+    image: apache/airflow:latest
+    container_name: airflow-worker
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://airflow-redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=redis://airflow-redis:6379/0
+      # Add Docker-related environment variables
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    depends_on:
+      - airflow-webserver
+      - airflow-scheduler
+      - airflow-redis
+      - airflow-postgres
+    command: airflow celery worker
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./scripts:/opt/airflow/scripts
+      # Mount Docker socket and add Docker CLI
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - /usr/libexec/docker:/usr/libexec/docker
+    # Add privileged mode and network settings
+    privileged: true
+    networks:
+      - default
+      - spark-network
+
+
+
+
+  # ===============================
+  #      Added Services Below
+  # ===============================
+
+  # Zookeeper (Required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  # Kafka (Streaming Data Extraction)
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # PySpark for Batch & Streaming Processing
+  pyspark:
+    image: jupyter/pyspark-notebook:latest
+    container_name: pyspark
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+    ports:
+      - "8888:8888"  # Jupyter Notebook
+      - "4040:4040"  # Spark UI
+    depends_on:
+      - kafka
+    volumes:
+      - ./airflow/dags:/home/jovyan
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - default
+      - spark-network
+
+  # Spark Master (Required for Spark Cluster)
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"
+      - "8081:8081"
+    networks:
+      - default
+      - spark-network
+
+  # Spark Worker
+  spark-worker:
+    image: bitnami/spark:latest
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+      
+    networks:
+      - default
+      - spark-network
+
+  # Snowflake Connector (For Loading Processed Data)
+  snowflake-connector:
+    image: python:3.9
+    container_name: snowflake-connector
+    command: [ "sleep", "infinity" ]
+    volumes:
+      - ./snowflake_script:/app
+    working_dir: /app
+    environment:
+      - SNOWFLAKE_ACCOUNT=<your_account>
+      - SNOWFLAKE_USER=<your_user>
+      - SNOWFLAKE_PASSWORD=<your_password>
+      - SNOWFLAKE_WAREHOUSE=<your_warehouse>
+      - SNOWFLAKE_DATABASE=<your_database>
+      - SNOWFLAKE_SCHEMA=<your_schema>
+    depends_on:
+      - pyspark
+    entrypoint: >
+      /bin/sh -c "pip install snowflake-connector-python && sleep infinity"
+
+  # ===============================
+  #        Added Kafka UI
+  # ===============================
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+      - zookeeper
+    ports:
+      - "8085:8080"  # Kafka UI accessible at http://localhost:8085
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+volumes:
+  airflow-postgres-data:
