@@ -1,131 +1,98 @@
+# Lending Club Data Engineering Project
 
-<h1 align="center">📊 Loans & Credits End-to-End Data Engineering Pipeline</h1>
+## Overview
 
+This project is a complete data engineering pipeline built on **Lending Club** data — a peer-to-peer lending platform that connects borrowers with investors. The project leverages both **batch** and **stream** data pipelines to ingest, process, transform, and load loan application data into a Snowflake data warehouse for analytics and monitoring.
+
+The goal is to build scalable and efficient pipelines using modern data engineering tools and best practices, simulating a real-world banking data workflow.
+
+📚 You can read more about Lending Club [here](https://en.wikipedia.org/wiki/Lending_Club).  
+📊 Dataset: [Kaggle - Loan Credit Risk and Population Stability](https://www.kaggle.com/datasets/beatafaron/loan-credit-risk-and-population-stability)
+
+---
+
+## Project Architecture
+
+- **Batch Pipeline**: Built using PySpark for transformation, integrated with Snowflake for data warehousing.
+- **Streaming Pipeline**: Simulated real-time data using Kafka, processed with PySpark Structured Streaming, and loaded into a separate streaming schema in Snowflake.
+- **Deployment**: Entire stack containerized using Docker and Docker Compose.
+
+📸 Pipeline 
 <p align="center">
-  <img src="./Data-pipeline.png" alt="Data Pipeline" width="600"/>
+  <img src="WorkFlow/pipeline.jpg" alt="Example Image" width="600"/>
 </p>
 
----
+## Pipeline Breakdown
 
-## 🔍 Overview
+### 1. Data Exploration
 
-This project demonstrates a complete data engineering pipeline that processes loan and credit data using both **batch** and **streaming** ingestion methods. It transforms and models the data into a star schema and loads it into **Snowflake** for downstream analytics and visualization.
+- Understand the business and data context of Lending Club's loan and risk profiles.
+- Explore two CSV datasets provided from Kaggle to assess credit risk and population stability.
+- Perform initial data cleaning and schema identification.
 
----
+### 2. Batch Pipeline
 
-## 🧱 Architecture Breakdown
+- **Data Source**: Two CSV files from Kaggle.
+- **ETL Process**:
+  - Extract data using PySpark.
+  - Transform using business logic (null handling, standardization, encoding).
+  - Load the data into Snowflake data warehouse using the **Snowflake Connector for Spark**.
+- **Schema**: Snowflake schema design.
 
-- **Batch Processing**: Historical data ingestion using Apache Spark from CSV files.
-- **Streaming**: Row-by-row real-time data simulation into Kafka and ingestion using Spark Structured Streaming.
-- **Data Modeling**: Dimensional star schema built with fact and dimension tables.
-- **Data Warehouse**: Cleaned data is stored in Snowflake.
-- **Dashboarding**: BI tools used to generate insights from the modeled data.
-
----
-
-## 🛠️ Tools & Technologies
-
-| Tool        | Purpose                          |
-|-------------|----------------------------------|
-| Apache Kafka | Real-time data ingestion         |
-| Apache Spark | Batch + Streaming transformation |
-| Snowflake    | Scalable cloud data warehouse    |
-| Python & PySpark | Scripting & transformation |
-| Power BI / Tableau | Data visualization        |
-
----
-
-## 🗂️ Repository Structure
-
-```
-├── Batch/               # Batch ingestion & transformation code
-├── Streaming/           # Kafka + Spark Streaming scripts
-├── Data Model/          # Data modeling diagrams
-├── Insights/            # Dashboards and visuals
-├── Tools settings/      # Configuration files
-└── Data-pipeline.png    # Pipeline architecture
-```
-
----
-
-## 🔁 Pipeline Overview
-
+  📸 Schema
 <p align="center">
-  <img src="./Data-pipeline.png" alt="Data Pipeline" width="600"/>
+  <img src="Model/loans model.png" alt="Example Image" width="600"/>
 </p>
+
+### 3. Streaming Pipeline
+
+- **Simulation**: A custom script was used to stream data in near real-time from a CSV file.
+- **Ingestion**: Kafka topics used to publish and consume records.
+- **Processing**: PySpark Structured Streaming processes the data stream.
+- **Storage**: Cleaned streaming data is loaded into Snowflake under a separate **streaming schema**.
+- **Schema**: Also based on Snowflake schema but adapted for streaming behavior.
 
 ---
 
-## 📊 Dashboard Insights
+## Tech Stack
 
-Visualizations were developed using BI tools to explore metrics such as loan volume, borrower profiles, and hardship trends.
-
-<p float="left" align="center">
-  <img src="./Insights/dashboard.png" width="48%"/>
-  <img src="./Insights/dashboard2.png" width="48%"/>
-</p>
+| Component        | Technology               |
+|------------------|--------------------------|
+| Data Warehouse   | Snowflake                |
+| Data Processing  | PySpark                  |
+| Streaming        | Apache Kafka             |
+| Containerization | Docker & Docker Compose  |
+| Data Source      | Kaggle CSV Files         |
 
 ---
 
-## 🧩 Dimensional Data Model
-
-A star schema is used to model the cleaned data for analytics.
-
+📸 Dashboard  
 <p align="center">
-  <img src="./Data%20Model/data_model.png" alt="Data Model" width="600"/>
+  <img src="Insights/Dashboard.png" alt="Example Image" width="600"/>
 </p>
+<p align="center">
+  <img src="Insights/Dashboard2.png" alt="Example Image" width="600"/>
+</p>
+## Project Structure
+
+lending-club-project/ │ ├── docker/ # Docker Compose setup ├── kafka/ # Kafka setup and simulation script ├── pyspark_jobs/ # PySpark ETL and streaming scripts ├── data/ # Input CSVs ├── snowflake_models/ # SQL models and schema design └── README.md # Project documentation
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-### 1. Clone the Repository
+### Prerequisites
+
+- Docker & Docker Compose installed
+- Snowflake account with credentials
+- Access to Kaggle dataset
+
+### Run the Project
+
+1. Clone the repository
+2. Add your Snowflake credentials to `.env`
+3. Place the Kaggle CSVs in the `data/` directory
+4. Run the following:
 
 ```bash
-git clone https://github.com/HaiidyHossam/Loans-Credits-end-to-end-data-engineering-solution.git
-cd Loans-Credits-end-to-end-data-engineering-solution
-```
-
-### 2. Set Up Environment
-
-Make sure you have the following installed:
-
-- Java 11+
-- Apache Spark 3.4+
-- Kafka (Docker or local)
-- Snowflake Account
-- Power BI or Tableau
-
-### 3. Run Batch Jobs
-
-Navigate to `/Batch` and run the PySpark scripts for batch ingestion.
-
-### 4. Run Streaming Jobs
-
-Simulate real-time ingestion by pushing rows to Kafka and consuming with Spark from `/Streaming`.
-
-### 5. Explore Dashboards
-
-Open dashboard files from the `/Insights` folder.
-
----
-
-## 📦 Dataset Source
-
-The dataset used in this project is publicly available on Kaggle:
-
-🔗 [Loan Credit Risk and Population Stability – Kaggle](https://www.kaggle.com/datasets/beatafaron/loan-credit-risk-and-population-stability)
-
----
-
-## 👩‍💻 Author
-
-**Haiidy Hossam**  
-💼 Data Engineering Enthusiast  
-📧 [haiidy.hossam@example.com](mailto:haiidy.hossam@example.com)
-
----
-
-## 📝 License
-
-This project is intended for learning and demonstration purposes only.
+docker-compose up --build
